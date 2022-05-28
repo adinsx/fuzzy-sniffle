@@ -1,25 +1,16 @@
 use macroquad::prelude::*;
 
 mod entity_event_engine;
+mod test_entities;
+
 use entity_event_engine::{
-    EntityEventEngine,
-    TimedEntity
+    EntityEventEngine
 };
 
-#[derive(Debug, Clone, Default)]
-pub struct TestEntity {
-    name: String,
-    speed: f32
-}
-
-impl TimedEntity for TestEntity {
-    fn get_speed(&self) -> f32 {
-        self.speed
-    }
-    fn update(&self) {
-        println!("Entity {} is updating!", self.name);
-    }
-}
+use test_entities::{
+    TestEntity,
+    TestEntity2
+};
 
 fn window_conf() -> Conf {
     Conf {
@@ -41,17 +32,10 @@ async fn main() {
 
     let mut entity_engine = EntityEventEngine::default();
     entity_engine.add_entity(TestEntity { name: "a".into(), speed: 20.0 });
-    entity_engine.add_entity(TestEntity { name: "b".into(), speed: 100.0 });
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
-    entity_engine.update_next();
+    entity_engine.add_entity(TestEntity2 { name: "b".into(), speed: 100.0, whatever: 1.0 });
+    for _ in 0..10 {
+        entity_engine.update_next();
+    }
 
     loop {
         clear_background(LIGHTGRAY);
