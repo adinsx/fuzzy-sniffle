@@ -1,7 +1,7 @@
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 use rand::{distributions::WeightedIndex, prelude::*, Rng};
-use std::fmt;
+use std::{cmp, fmt};
 
 #[derive(Copy, Clone)]
 
@@ -63,16 +63,16 @@ impl fmt::Display for Map {
     }
 }
 
-pub struct DungeonMap {
+pub struct CaveMap {
     pub map: Map,
     edge_repulsion_dist: u32,
     //min_treasures: u32,
     //max_treasures: u32,
     coverage: f32,
 }
-impl DungeonMap {
-    pub fn new(width: u32, height: u32) -> DungeonMap {
-        let mut ret = DungeonMap {
+impl CaveMap {
+    pub fn new(width: u32, height: u32) -> CaveMap {
+        let mut ret = CaveMap {
             map: Map::new(width, height),
             edge_repulsion_dist: 10,
             coverage: 0.3,
@@ -80,6 +80,7 @@ impl DungeonMap {
         ret.gen();
         ret
     }
+    // Move away from walls more as you get closer to them
     fn default_move_weight(&self, relevant_coord: u32, relevant_size: u32) -> f32 {
         if relevant_coord < self.edge_repulsion_dist {
             1f32 - (self.edge_repulsion_dist - relevant_coord) as f32
@@ -103,16 +104,6 @@ impl DungeonMap {
     fn default_move_down_weight(&self, y: u32) -> f32 {
         self.default_move_weight(self.map.height - y - 1, self.map.height)
     }
-    // fn default_move_left_weight(&self, x: u32) -> f32 {
-    //     if x < self.edge_repulsion_dist {
-    //         1f32 - (self.edge_repulsion_dist - x) as f32 / (self.edge_repulsion_dist - 1) as f32
-    //     } else if x > self.map.width - self.edge_repulsion_dist - 1 {
-    //         1f32 + (x - self.map.width + self.edge_repulsion_dist + 1) as f32
-    //             / (self.edge_repulsion_dist - 1) as f32
-    //     } else {
-    //         1f32
-    //     }
-    // }
     fn gen(&mut self) {
         let num_floors_to_get =
             (self.coverage * self.map.width as f32 * self.map.height as f32).round() as u32;
@@ -129,7 +120,7 @@ impl DungeonMap {
             .unwrap()
             .solid = false;
 
-        #[derive(Debug, Copy, Clone)]
+        #[derive(Debug, Copy, Clone, PartialEq)]
         enum Direction {
             NoDir,
             Up,
@@ -151,31 +142,62 @@ impl DungeonMap {
         let mut weights = [1f32; 4];
         let mut rng = thread_rng();
 
-        while num_floors < num_floors_to_get {
-            // reset weights back to default
-            weights[0] = self.default_move_up_weight(current_tile_coord.1);
-            weights[1] = self.default_move_right_weight(current_tile_coord.0);
-            weights[2] = self.default_move_down_weight(current_tile_coord.1);
-            weights[3] = self.default_move_left_weight(current_tile_coord.0);
+        const LOCK_DIRECTION_BUFFER: u32 = 5;
+        let mut lock_direction_remaining = 0;
 
-            // if you just moved up, you can't move down etc...
-            match previous_dir {
-                Direction::NoDir => { /* first loop, nothing needed */ }
-                Direction::Up => weights[2] = 0f32,
-                Direction::Right => weights[3] = 0f32,
-                Direction::Down => weights[0] = 0f32,
-                Direction::Left => weights[1] = 0f32,
+        while num_floors < num_floors_to_get {
+            let next_dir;
+            if lock_direction_remaining > 0 && previous_dir != Direction::NoDir {
+                if (previous_dir == Direction::Up && current_tile_coord.1 < LOCK_DIRECTION_BUFFER)
+                    || (previous_dir == Direction::Right
+                        && current_tile_coord.0 > self.map.width - LOCK_DIRECTION_BUFFER - 1)
+                    || (previous_dir == Direction::Down
+                        && current_tile_coord.1 > self.map.height - LOCK_DIRECTION_BUFFER - 1)
+                    || (previous_dir == Direction::Left
+                        && current_tile_coord.0 < LOCK_DIRECTION_BUFFER)
+                {
+                    // We're too close to the edge to continue going in the same direction
+                    // Stop the direction lock and continue as normal
+                    lock_direction_remaining = 0;
+                    continue;
+                } else {
+                    lock_direction_remaining -= 1;
+                    next_dir = previous_dir
+                }
+            } else if rng.gen_range(0.0f32..1.0f32) < 0.005f32 && previous_dir != Direction::NoDir {
+                // special event where a direction is disabled for a random number of times.
+                let min_dimension = cmp::min(self.map.width, self.map.height);
+                let range = cmp::max(min_dimension / 10, 1)..min_dimension / 4;
+                lock_direction_remaining = rng.gen_range(range);
+                next_dir = previous_dir;
+            } else {
+                // reset weights back to default
+                weights[0] = self.default_move_up_weight(current_tile_coord.1);
+                weights[1] = self.default_move_right_weight(current_tile_coord.0);
+                weights[2] = self.default_move_down_weight(current_tile_coord.1);
+                weights[3] = self.default_move_left_weight(current_tile_coord.0);
+
+                // if you just moved up, you can't move down etc...
+                match previous_dir {
+                    Direction::NoDir => { /* first loop, nothing needed */ }
+                    Direction::Up => weights[2] = 0f32,
+                    Direction::Right => weights[3] = 0f32,
+                    Direction::Down => weights[0] = 0f32,
+                    Direction::Left => weights[1] = 0f32,
+                }
+
+                let dist = WeightedIndex::new(&weights).unwrap();
+                next_dir = directions[dist.sample(&mut rng)];
             }
-            let dist = WeightedIndex::new(&weights).unwrap();
-            let move_dir = directions[dist.sample(&mut rng)];
-            match move_dir {
+
+            match next_dir {
                 Direction::Up => current_tile_coord.1 -= 1,
                 Direction::Right => current_tile_coord.0 += 1,
                 Direction::Down => current_tile_coord.1 += 1,
                 Direction::Left => current_tile_coord.0 -= 1,
                 _ => panic!(),
             }
-            previous_dir = move_dir;
+            previous_dir = next_dir;
 
             // If it's not already a floor (if it is solid)
             if self

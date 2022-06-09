@@ -1,7 +1,7 @@
 mod map;
 
 use macroquad::prelude::*;
-use map::DungeonMap;
+use map::CaveMap;
 
 fn window_conf() -> Conf {
     Conf {
@@ -15,7 +15,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     // Max's testing start
-    let dungeon = DungeonMap::new(50, 30);
+    let dungeon = CaveMap::new(100, 50);
     println!("{}", dungeon.map);
     // Max's testing end
 
