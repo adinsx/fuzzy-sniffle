@@ -223,5 +223,26 @@ impl CaveMap {
                 }
             }
         }
+
+        //==================== POST PROCESS ====================
+
+        // Start and end can't be too close to edge. For start this is already done based
+        // on it's initial possible values but end might be near an edge and need fixed
+        end.0 = end.0.clamp(2, self.map.width - 3);
+        end.1 = end.1.clamp(2, self.map.height - 3);
+
+        // Pad start and end with surrounding floors.
+        for x in -1..2 {
+            for y in -1..2 {
+                self.map
+                    .get_tile_mut((start.0 as i32 + x) as u32, (start.1 as i32 + y) as u32)
+                    .unwrap()
+                    .solid = false;
+                self.map
+                    .get_tile_mut((end.0 as i32 + x) as u32, (end.1 as i32 + y) as u32)
+                    .unwrap()
+                    .solid = false;
+            }
+        }
     }
 }
