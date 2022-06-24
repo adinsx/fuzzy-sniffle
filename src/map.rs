@@ -6,12 +6,12 @@ use std::{cmp, fmt};
 #[derive(Copy, Clone)]
 
 pub struct Tile {
-    pub solid: bool,
+    pub wall: bool,
 }
 impl fmt::Display for Tile {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", if self.solid { "\u{2588}" } else { " " })
+        write!(f, "{}", if self.wall { "\u{2588}" } else { " " })
     }
 }
 
@@ -26,7 +26,7 @@ impl Map {
         Map {
             width,
             height,
-            tiles: vec![Tile { solid: true }; (width * height) as usize],
+            tiles: vec![Tile { wall: true }; (width * height) as usize],
             //..Default::default()
         }
     }
@@ -44,6 +44,18 @@ impl Map {
     pub fn get_tile_mut(&mut self, x: u32, y: u32) -> Option<&mut Tile> {
         let index = self.xy_to_idx(x, y);
         self.tiles.get_mut(index)
+    }
+    // Allows negative numbers and numbers larger than the size allows and wraps around
+    pub fn get_tile_modulo(&self, x: i32, y: i32) -> Option<&Tile> {
+        let mod_x = x.rem_euclid(self.width as i32) as u32;
+        let mod_y = y.rem_euclid(self.height as i32) as u32;
+        self.get_tile(mod_x, mod_y)
+    }
+    // Allows negative numbers and numbers larger than the size allows and wraps around
+    pub fn get_tile_modulo_mut(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
+        let mod_x = x.rem_euclid(self.width as i32) as u32;
+        let mod_y = y.rem_euclid(self.height as i32) as u32;
+        self.get_tile_mut(mod_x, mod_y)
     }
 }
 impl fmt::Display for Map {
@@ -104,6 +116,48 @@ impl CaveMap {
     fn default_move_down_weight(&self, y: u32) -> f32 {
         self.default_move_weight(self.map.height - y - 1, self.map.height)
     }
+    fn num_wall_neighbors(&self, x: u32, y: u32) -> u32 {
+        let i_x = x as i32;
+        let i_y = y as i32;
+
+        self.map.get_tile_modulo(i_x - 1, i_y - 1).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x - 1, i_y).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x - 1, i_y + 1).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x, i_y - 1).unwrap().wall as u32 +
+        // Don't include yourself!
+        self.map.get_tile_modulo(i_x, i_y + 1).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x + 1, i_y - 1).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x + 1, i_y).unwrap().wall as u32 +
+        self.map.get_tile_modulo(i_x + 1, i_y + 1).unwrap().wall as u32
+    }
+    // With (x,y) being the top left corner, figure out if we have either one these patterns
+    // _ = not wall
+    // O = wall
+    //
+    // O_
+    // _O which returns \
+    //
+    // _O
+    // O_ which returns /
+    //
+    // no match returns empty string
+    fn is_part_of_checkerboard(&self, x: u32, y: u32) -> &str {
+        let mut ret = "";
+        let i_x = x as i32;
+        let i_y = y as i32;
+        // nw ne
+        // sw se
+        let nw = self.map.get_tile_modulo(i_x, i_y).unwrap().wall;
+        let ne = self.map.get_tile_modulo(i_x + 1, i_y).unwrap().wall;
+        let sw = self.map.get_tile_modulo(i_x, i_y + 1).unwrap().wall;
+        let se = self.map.get_tile_modulo(i_x + 1, i_y + 1).unwrap().wall;
+
+        if nw == se && ne == sw && nw != ne {
+            // We've matched one of the patterns, now figure out which one
+            ret = if nw { "\\" } else { "/" };
+        }
+        ret
+    }
     fn gen(&mut self) {
         let num_floors_to_get =
             (self.coverage * self.map.width as f32 * self.map.height as f32).round() as u32;
@@ -118,7 +172,7 @@ impl CaveMap {
         self.map
             .get_tile_mut(current_tile_coord.0, current_tile_coord.1)
             .unwrap()
-            .solid = false;
+            .wall = false;
 
         #[derive(Debug, Copy, Clone, PartialEq)]
         enum Direction {
@@ -204,13 +258,13 @@ impl CaveMap {
                 .map
                 .get_tile(current_tile_coord.0, current_tile_coord.1)
                 .unwrap()
-                .solid
+                .wall
             {
                 // Make it a floor
                 self.map
                     .get_tile_mut(current_tile_coord.0, current_tile_coord.1)
                     .unwrap()
-                    .solid = false;
+                    .wall = false;
                 num_floors += 1;
 
                 let dist_from_start = ((current_tile_coord.0 as i32 - start.0 as i32).abs()
@@ -237,11 +291,58 @@ impl CaveMap {
                 self.map
                     .get_tile_mut((start.0 as i32 + x) as u32, (start.1 as i32 + y) as u32)
                     .unwrap()
-                    .solid = false;
+                    .wall = false;
                 self.map
                     .get_tile_mut((end.0 as i32 + x) as u32, (end.1 as i32 + y) as u32)
                     .unwrap()
-                    .solid = false;
+                    .wall = false;
+            }
+        }
+
+        let mut recheck = true;
+        while recheck {
+            recheck = false;
+            for x in 0..self.map.width {
+                for y in 0..self.map.height {
+                    // First check for and remove checkboard patterns
+                    let checkered = self.is_part_of_checkerboard(x, y);
+                    match checkered {
+                        // If it's part of a checkerboard, turn the walls to floor
+                        "\\" => {
+                            self.map
+                                .get_tile_modulo_mut(x as i32, y as i32)
+                                .unwrap()
+                                .wall = false;
+                            self.map
+                                .get_tile_modulo_mut((x + 1) as i32, (y + 1) as i32)
+                                .unwrap()
+                                .wall = false;
+                            recheck = true;
+                        }
+                        "/" => {
+                            self.map
+                                .get_tile_modulo_mut((x + 1) as i32, y as i32)
+                                .unwrap()
+                                .wall = false;
+                            self.map
+                                .get_tile_modulo_mut(x as i32, (y + 1) as i32)
+                                .unwrap()
+                                .wall = false;
+                            recheck = true;
+                        }
+                        "" => { /* not a checkerboard, nothing to do */ }
+                        _ => panic!(),
+                    }
+                    // Then check for and remove walls with less than 2 neighbors
+                    let tile = self.map.get_tile_modulo(x as i32, y as i32).unwrap();
+                    if tile.wall && self.num_wall_neighbors(x, y) < 2 {
+                        self.map
+                            .get_tile_modulo_mut(x as i32, y as i32)
+                            .unwrap()
+                            .wall = false;
+                        recheck = true;
+                    }
+                }
             }
         }
     }
