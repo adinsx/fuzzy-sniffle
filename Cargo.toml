@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 macroquad = "0.3.16"
+malachite-q = "0.2.4"
 rand = "0.8.3"
