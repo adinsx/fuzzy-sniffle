@@ -1,7 +1,7 @@
-mod map;
+mod maps;
 
 use macroquad::prelude::*;
-use map::CaveMap;
+use maps::cave_map::CaveMap;
 
 fn window_conf() -> Conf {
     Conf {
