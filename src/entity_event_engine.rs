@@ -17,14 +17,14 @@ for _ in 0..10 {
 
 // All game entities that need to be in the EntityEventEngine must implement this trait!
 pub trait TimedEntity {
-    fn get_speed(&self) -> f32;
+    fn get_speed(&self) -> f64;
     fn update(&self);
 }
 
 // The main engine struct you'll want to instantiate
 #[derive(Default)]
 pub struct EntityEventEngine {
-    time: f32,
+    time: f64,
     entity_queue: BinaryHeap<EngineTrackedEntity>,
 }
 
@@ -58,7 +58,7 @@ impl EntityEventEngine {
 // so the engine knows when to call update() on the entity.
 struct EngineTrackedEntity {
     entity: Box<dyn TimedEntity>, // using dynamic dispatch here so ANY object using TimedEntity can be put in.
-    next_update: f32
+    next_update: f64
 }
 
 // ===== required impls for the container struct so they can be put in a BinaryHeap =====
@@ -87,6 +87,6 @@ impl Eq for EngineTrackedEntity {}
 // ===== END required impls for the container struct so they can be put in a BinaryHeap =====
 
 // just an example function to convert a speed to a time to wait till the next update.
-fn speed_to_time_cooldown(speed: f32) -> f32 {
+fn speed_to_time_cooldown(speed: f64) -> f64 {
     100.0 / (0.01 * speed + 1.0)
 }
