@@ -1,5 +1,9 @@
 // mod entity_event_engine;
-use crate::entity_event_engine::TimedEntity;
+use crate::entity_event_engine::{
+    TimedEntity,
+    EntityHolder
+};
+use crate::game_state::GameState;
 
 #[derive(Debug, Clone, Default)]
 pub struct TestEntity {
@@ -11,8 +15,10 @@ impl TimedEntity for TestEntity {
     fn get_speed(&self) -> f64 {
         self.speed
     }
-    fn update(&self) {
+    // Box<dyn EntityHolder>
+    fn update(&self, game_state: &mut dyn EntityHolder) -> bool {
         println!("Entity {} is updating!", self.name);
+        true
     }
 }
 
@@ -27,7 +33,8 @@ impl TimedEntity for TestEntity2 {
     fn get_speed(&self) -> f64 {
         self.speed
     }
-    fn update(&self) {
+    fn update(&self, game_state: &mut dyn EntityHolder) -> bool {
         println!("TestEntity2 {} is updating!", self.name);
+        true
     }
 }

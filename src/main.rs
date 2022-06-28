@@ -1,7 +1,10 @@
 use macroquad::prelude::*;
 
+mod game_state;
 mod entity_event_engine;
 mod test_entities;
+
+use game_state::{GameState};
 
 use entity_event_engine::{
     EntityEventEngine
@@ -30,9 +33,14 @@ async fn main() {
     let mut player_x: f32 = 0.0;
     let mut player_y: f32 = 0.0;
 
-    let mut entity_engine = EntityEventEngine::default();
-    entity_engine.add_entity(TestEntity { name: "a".into(), speed: 20.0 });
-    entity_engine.add_entity(TestEntity2 { name: "b".into(), speed: 100.0, whatever: 1.0 });
+    let game_state = Box::new(GameState::default());
+    let mut entity_engine = EntityEventEngine::new(game_state);
+
+    {
+        entity_engine.add_entity(Box::new(TestEntity { name: "a".into(), speed: 20.0 }));
+        entity_engine.add_entity(Box::new(TestEntity2 { name: "b".into(), speed: 100.0, whatever: 1.0 }));
+    }
+
     for _ in 0..10 {
         entity_engine.update_next();
     }

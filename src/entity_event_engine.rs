@@ -18,23 +18,59 @@ for _ in 0..10 {
 // All game entities that need to be in the EntityEventEngine must implement this trait!
 pub trait TimedEntity {
     fn get_speed(&self) -> f64;
-    fn update(&self);
+    fn update(&self, game_state: &mut dyn EntityHolder) -> bool;
+}
+
+pub trait EntityHolder {
+    fn get_entity_by_id(&self, id: i32) -> Option<&dyn TimedEntity>;
+    fn remove_entity_by_id(&mut self, id: i32) -> Option<&dyn TimedEntity>;
+    fn add_entity(&mut self, entity: Box<dyn TimedEntity>);
+    fn get_next_entity_id(&self) -> i32;
 }
 
 // The main engine struct you'll want to instantiate
-#[derive(Default)]
 pub struct EntityEventEngine {
     time: f64,
+    game_state: Box<dyn EntityHolder>,
     entity_queue: BinaryHeap<EngineTrackedEntity>,
 }
 
 impl EntityEventEngine {
+    pub fn new(game_state: Box<dyn EntityHolder>) -> EntityEventEngine {
+        EntityEventEngine {
+            time: 0.0,
+            game_state,
+            entity_queue: BinaryHeap::default()
+        }
+    }
+
     // This trait bound is the secret sauce that allows any TimedEntity object to be added. It must also be static.
-    pub fn add_entity<T:TimedEntity + 'static>(&mut self, entity: T) {
+    // pub fn add_entity<T:TimedEntity + 'static>(&mut self, entity: T) {
+    //     let cooldown = speed_to_time_cooldown(entity.get_speed());
+    //     self.entity_queue.push(EngineTrackedEntity {
+    //         // because we are using dynamic dispatch, entities must be Boxed so EngineTrackedEntities have a fixed size.
+    //         entity: Box::new(entity), // a fixed size box pointing to some unknown size obj.
+    //         next_update: self.time + cooldown
+    //     });
+    // }
+    // pub fn add_entity(&mut self, entity_id: i32) {
+    //     let entity = match self.game_state.get_entity_by_id(entity_id) {
+    //         Some(entity) => entity,
+    //         None => return
+    //     };
+    //     let cooldown = speed_to_time_cooldown(entity.get_speed());
+    //     self.entity_queue.push(EngineTrackedEntity {
+    //         entity_id,
+    //         next_update: self.time + cooldown
+    //     });
+    // }
+    pub fn add_entity(&mut self, entity: Box<dyn TimedEntity>) {
+        let entity_id = self.game_state.get_next_entity_id();
         let cooldown = speed_to_time_cooldown(entity.get_speed());
+        self.game_state.add_entity(entity);
+
         self.entity_queue.push(EngineTrackedEntity {
-            // because we are using dynamic dispatch, entities must be Boxed so EngineTrackedEntities have a fixed size.
-            entity: Box::new(entity), // a fixed size box pointing to some unknown size obj.
+            entity_id,
             next_update: self.time + cooldown
         });
     }
@@ -46,18 +82,27 @@ impl EntityEventEngine {
         };
         self.time = tracked_entity.next_update;
         println!("Time is {}", self.time);
-        tracked_entity.entity.update();
 
-        let cooldown = speed_to_time_cooldown(tracked_entity.entity.get_speed());
+        let entity = match self.game_state.get_entity_by_id(tracked_entity.entity_id) {
+            Some(entity) => entity,
+            None => return
+        };
+
+        let alive = entity.update(self.game_state.as_mut());
+
+        let cooldown = speed_to_time_cooldown(entity.get_speed());
         tracked_entity.next_update = self.time + cooldown;
-        self.entity_queue.push(tracked_entity);
+
+        if alive {
+            self.entity_queue.push(tracked_entity);
+        }
     }
 }
 
 // This "container" struct pairs the generic entity with a next_update float,
 // so the engine knows when to call update() on the entity.
 struct EngineTrackedEntity {
-    entity: Box<dyn TimedEntity>, // using dynamic dispatch here so ANY object using TimedEntity can be put in.
+    entity_id: i32,
     next_update: f64
 }
 
