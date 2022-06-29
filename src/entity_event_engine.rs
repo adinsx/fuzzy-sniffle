@@ -1,7 +1,4 @@
-use std::{
-    collections::BinaryHeap,
-    cmp::Ordering
-};
+use std::{cmp::Ordering, collections::BinaryHeap};
 
 /*
 Example usage:
@@ -22,8 +19,8 @@ pub trait TimedEntity {
 }
 
 pub trait EntityHolder {
-    fn get_entity_by_id(&self, id: i32) -> Option<&dyn TimedEntity>;
-    fn remove_entity_by_id(&mut self, id: i32) -> Option<&dyn TimedEntity>;
+    fn get_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity>>;
+    fn remove_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity>>;
     fn add_entity(&mut self, entity: Box<dyn TimedEntity>);
     fn get_next_entity_id(&self) -> i32;
 }
@@ -40,7 +37,7 @@ impl EntityEventEngine {
         EntityEventEngine {
             time: 0.0,
             game_state,
-            entity_queue: BinaryHeap::default()
+            entity_queue: BinaryHeap::default(),
         }
     }
 
@@ -71,27 +68,27 @@ impl EntityEventEngine {
 
         self.entity_queue.push(EngineTrackedEntity {
             entity_id,
-            next_update: self.time + cooldown
+            next_update: self.time + cooldown,
         });
     }
 
     pub fn update_next(&mut self) {
         let mut tracked_entity = match self.entity_queue.pop() {
             Some(e) => e,
-            None => return // dont do anything if there are no objects in the queue.
+            None => return, // dont do anything if there are no objects in the queue.
         };
         self.time = tracked_entity.next_update;
         println!("Time is {}", self.time);
 
         let entity = match self.game_state.get_entity_by_id(tracked_entity.entity_id) {
             Some(entity) => entity,
-            None => return
+            None => return,
         };
-
-        let alive = entity.update(self.game_state.as_mut());
 
         let cooldown = speed_to_time_cooldown(entity.get_speed());
         tracked_entity.next_update = self.time + cooldown;
+
+        let alive = entity.update(self.game_state.as_mut());
 
         if alive {
             self.entity_queue.push(tracked_entity);
@@ -103,7 +100,7 @@ impl EntityEventEngine {
 // so the engine knows when to call update() on the entity.
 struct EngineTrackedEntity {
     entity_id: i32,
-    next_update: f64
+    next_update: f64,
 }
 
 // ===== required impls for the container struct so they can be put in a BinaryHeap =====
@@ -115,7 +112,7 @@ impl PartialOrd for EngineTrackedEntity {
 
 impl Ord for EngineTrackedEntity {
     fn cmp(&self, other: &Self) -> Ordering {
-        match other.partial_cmp(&self) {
+        match other.partial_cmp(self) {
             Some(o) => o,
             None => std::cmp::Ordering::Greater,
         }

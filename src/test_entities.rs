@@ -1,14 +1,11 @@
 // mod entity_event_engine;
-use crate::entity_event_engine::{
-    TimedEntity,
-    EntityHolder
-};
+use crate::entity_event_engine::{EntityHolder, TimedEntity};
 use crate::game_state::GameState;
 
 #[derive(Debug, Clone, Default)]
 pub struct TestEntity {
     pub name: String,
-    pub speed: f64
+    pub speed: f64,
 }
 
 impl TimedEntity for TestEntity {
@@ -26,7 +23,7 @@ impl TimedEntity for TestEntity {
 pub struct TestEntity2 {
     pub name: String,
     pub speed: f64,
-    pub whatever: f64
+    pub whatever: f64,
 }
 
 impl TimedEntity for TestEntity2 {

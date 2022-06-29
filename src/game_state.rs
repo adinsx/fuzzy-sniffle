@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::entity_event_engine::{TimedEntity, EntityHolder};
+use crate::entity_event_engine::{EntityHolder, TimedEntity};
 
 #[derive(Default)]
 pub struct GameState {
@@ -8,18 +8,17 @@ pub struct GameState {
 }
 
 impl EntityHolder for GameState {
-    fn get_entity_by_id(&self, entity_id:i32) -> Option<&dyn TimedEntity> {
-        let a = self.entities.get(&entity_id);
-        a.map(Box::as_ref)
+    fn get_entity_by_id(&mut self, entity_id: i32) -> Option<Box<dyn TimedEntity>> {
+        self.entities.remove(&entity_id)
     }
 
-    fn remove_entity_by_id(&mut self, entity_id:i32) -> Option<&dyn TimedEntity> {
-        let a = self.entities.remove(&entity_id);
-        let b = match a {
+    fn remove_entity_by_id(&mut self, entity_id: i32) -> Option<Box<dyn TimedEntity>> {
+        self.entities.remove(&entity_id)
+        /*         let b = match a {
             Some(a) => a,
-            None => panic!("FUCK")
+            None => panic!("FUCK"),
         };
-        return Some(&*b);
+        return Some(b); */
     }
 
     fn get_next_entity_id(&self) -> i32 {

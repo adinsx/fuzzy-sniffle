@@ -1,19 +1,14 @@
 use macroquad::prelude::*;
 
-mod game_state;
 mod entity_event_engine;
+mod game_state;
 mod test_entities;
 
-use game_state::{GameState};
+use game_state::GameState;
 
-use entity_event_engine::{
-    EntityEventEngine
-};
+use entity_event_engine::{EntityEventEngine, TimedEntity};
 
-use test_entities::{
-    TestEntity,
-    TestEntity2
-};
+use test_entities::{TestEntity, TestEntity2};
 
 fn window_conf() -> Conf {
     Conf {
@@ -37,9 +32,17 @@ async fn main() {
     let mut entity_engine = EntityEventEngine::new(game_state);
 
     {
-        entity_engine.add_entity(Box::new(TestEntity { name: "a".into(), speed: 20.0 }));
-        entity_engine.add_entity(Box::new(TestEntity2 { name: "b".into(), speed: 100.0, whatever: 1.0 }));
+        entity_engine.add_entity(Box::new(TestEntity {
+            name: "a".into(),
+            speed: 20.0,
+        }));
+        entity_engine.add_entity(Box::new(TestEntity2 {
+            name: "b".into(),
+            speed: 100.0,
+            whatever: 1.0,
+        }));
     }
+    println!("sizof box: {}", std::mem::size_of::<Box<dyn TimedEntity>>());
 
     for _ in 0..10 {
         entity_engine.update_next();
@@ -63,6 +66,6 @@ async fn main() {
 
         draw_texture(suwako_tex, player_x, player_y, WHITE);
 
-        next_frame().await
+        next_frame().await;
     }
 }
