@@ -1,4 +1,12 @@
-use std::{cmp::Ordering, collections::BinaryHeap};
+use std::{
+    cmp::Ordering,
+    collections::{
+        HashMap,
+        BinaryHeap, hash_map::Entry
+    },
+};
+
+use core::hash::Hash;
 
 /*
 Example usage:
@@ -13,27 +21,28 @@ for _ in 0..10 {
 */
 
 // All game entities that need to be in the EntityEventEngine must implement this trait!
-pub trait TimedEntity {
+pub trait TimedEntity<K> {
     fn get_speed(&self) -> f64;
-    fn update(&self, game_state: &mut dyn EntityHolder) -> bool;
+    fn update(&self, game_state: &mut HashMap<K, Box<dyn TimedEntity<K>>>) -> bool;
 }
 
-pub trait EntityHolder {
-    fn get_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity>>;
-    fn remove_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity>>;
-    fn add_entity(&mut self, entity: Box<dyn TimedEntity>);
-    fn get_next_entity_id(&self) -> i32;
-}
+// pub trait EntityHolder<K> {
+//     fn get_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity<K>>>;
+//     fn remove_entity_by_id(&mut self, id: i32) -> Option<Box<dyn TimedEntity<K>>>;
+//     fn add_entity(&mut self, entity: Box<dyn TimedEntity<K>>);
+//     fn get_next_entity_id(&self) -> i32;
+// }
 
 // The main engine struct you'll want to instantiate
-pub struct EntityEventEngine {
+pub struct EntityEventEngine<K: Hash + Eq> {
     time: f64,
-    game_state: Box<dyn EntityHolder>,
-    entity_queue: BinaryHeap<EngineTrackedEntity>,
+    // game_state: Box<dyn EntityHolder>,
+    pub game_state: HashMap<K, Box<dyn TimedEntity<K>>>,
+    entity_queue: BinaryHeap<EngineTrackedEntity<K>>,
 }
 
-impl EntityEventEngine {
-    pub fn new(game_state: Box<dyn EntityHolder>) -> EntityEventEngine {
+impl<K: Hash + Eq + Copy> EntityEventEngine<K> {
+    pub fn new(game_state: HashMap<K, Box<dyn TimedEntity<K>>>) -> EntityEventEngine<K> {
         EntityEventEngine {
             time: 0.0,
             game_state,
@@ -41,33 +50,12 @@ impl EntityEventEngine {
         }
     }
 
-    // This trait bound is the secret sauce that allows any TimedEntity object to be added. It must also be static.
-    // pub fn add_entity<T:TimedEntity + 'static>(&mut self, entity: T) {
-    //     let cooldown = speed_to_time_cooldown(entity.get_speed());
-    //     self.entity_queue.push(EngineTrackedEntity {
-    //         // because we are using dynamic dispatch, entities must be Boxed so EngineTrackedEntities have a fixed size.
-    //         entity: Box::new(entity), // a fixed size box pointing to some unknown size obj.
-    //         next_update: self.time + cooldown
-    //     });
-    // }
-    // pub fn add_entity(&mut self, entity_id: i32) {
-    //     let entity = match self.game_state.get_entity_by_id(entity_id) {
-    //         Some(entity) => entity,
-    //         None => return
-    //     };
-    //     let cooldown = speed_to_time_cooldown(entity.get_speed());
-    //     self.entity_queue.push(EngineTrackedEntity {
-    //         entity_id,
-    //         next_update: self.time + cooldown
-    //     });
-    // }
-    pub fn add_entity(&mut self, entity: Box<dyn TimedEntity>) {
-        let entity_id = self.game_state.get_next_entity_id();
+    pub fn add_entity(&mut self, key: K, entity: Box<dyn TimedEntity<K>>) {
         let cooldown = speed_to_time_cooldown(entity.get_speed());
-        self.game_state.add_entity(entity);
+        self.game_state.insert(key, entity);
 
         self.entity_queue.push(EngineTrackedEntity {
-            entity_id,
+            entity_id: key,
             next_update: self.time + cooldown,
         });
     }
@@ -80,7 +68,7 @@ impl EntityEventEngine {
         self.time = tracked_entity.next_update;
         println!("Time is {}", self.time);
 
-        let entity = match self.game_state.get_entity_by_id(tracked_entity.entity_id) {
+        let entity = match self.game_state.remove(&tracked_entity.entity_id) {
             Some(entity) => entity,
             None => return,
         };
@@ -88,7 +76,9 @@ impl EntityEventEngine {
         let cooldown = speed_to_time_cooldown(entity.get_speed());
         tracked_entity.next_update = self.time + cooldown;
 
-        let alive = entity.update(self.game_state.as_mut());
+        let alive = entity.update(&mut self.game_state);
+
+        self.game_state.insert(tracked_entity.entity_id, entity);
 
         if alive {
             self.entity_queue.push(tracked_entity);
@@ -98,19 +88,19 @@ impl EntityEventEngine {
 
 // This "container" struct pairs the generic entity with a next_update float,
 // so the engine knows when to call update() on the entity.
-struct EngineTrackedEntity {
-    entity_id: i32,
+struct EngineTrackedEntity<K> {
+    entity_id: K,
     next_update: f64,
 }
 
 // ===== required impls for the container struct so they can be put in a BinaryHeap =====
-impl PartialOrd for EngineTrackedEntity {
+impl<K> PartialOrd for EngineTrackedEntity<K> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.next_update.partial_cmp(&self.next_update)
     }
 }
 
-impl Ord for EngineTrackedEntity {
+impl<K> Ord for EngineTrackedEntity<K> {
     fn cmp(&self, other: &Self) -> Ordering {
         match other.partial_cmp(self) {
             Some(o) => o,
@@ -119,13 +109,13 @@ impl Ord for EngineTrackedEntity {
     }
 }
 
-impl PartialEq for EngineTrackedEntity {
+impl<K> PartialEq for EngineTrackedEntity<K> {
     fn eq(&self, other: &Self) -> bool {
         self.next_update == other.next_update
     }
 }
 
-impl Eq for EngineTrackedEntity {}
+impl<K> Eq for EngineTrackedEntity<K> {}
 // ===== END required impls for the container struct so they can be put in a BinaryHeap =====
 
 // just an example function to convert a speed to a time to wait till the next update.
