@@ -2,7 +2,12 @@ use super::map::Map;
 use rand::{distributions::WeightedIndex, prelude::*, Rng};
 use std::cmp;
 
+//TODO: This function can be broken apart later once we have more *_map_gen functions and know what their overlapping interests are. For now, clippy can stfu
+#[allow(clippy::too_many_lines)]
 pub fn cave_map_gen(map: &mut Map, floor_coverage: f32, edge_repulsion_dist: u32) {
+    //TODO: Maybe? use the type system to create a wrapper type like: Finite<f32> that guarantees that the wrapped float is finite. Or find a crate that accomplishes the same.
+    assert!(floor_coverage.is_finite());
+
     let width = map.width;
     let height = map.height;
     // Move away from walls more as you get closer to them
