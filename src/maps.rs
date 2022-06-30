@@ -1,3 +1,3 @@
-pub mod cave_map;
-mod map_base;
+pub mod cave_map_gen;
+pub mod map;
 mod tile;

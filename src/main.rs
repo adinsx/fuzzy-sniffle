@@ -1,7 +1,7 @@
 mod maps;
 
 use macroquad::prelude::*;
-use maps::cave_map::CaveMap;
+use maps::{cave_map_gen::cave_map_gen, map::Map};
 
 fn window_conf() -> Conf {
     Conf {
@@ -15,8 +15,9 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     // Max's testing start
-    let dungeon = CaveMap::new(100, 50);
-    println!("{}", dungeon.map);
+    let mut cave = Map::new(100, 50);
+    cave_map_gen(&mut cave, 0.3, 10);
+    println!("{}", cave);
     // Max's testing end
 
     let suwako_tex: Texture2D = load_texture("suwako.png").await.unwrap();

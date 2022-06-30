@@ -2,14 +2,14 @@ use super::tile::Tile;
 use std::fmt;
 
 #[derive(Default)]
-pub struct MapBase {
+pub struct Map {
     pub width: u32,
     pub height: u32,
     tiles: Vec<Tile>,
 }
-impl MapBase {
-    pub fn new(width: u32, height: u32) -> MapBase {
-        MapBase {
+impl Map {
+    pub fn new(width: u32, height: u32) -> Map {
+        Map {
             width,
             height,
             tiles: vec![Tile { wall: true }; (width * height) as usize],
@@ -44,7 +44,7 @@ impl MapBase {
         self.get_tile_mut(mod_x, mod_y)
     }
 }
-impl fmt::Display for MapBase {
+impl fmt::Display for Map {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for y in 0..self.height {
