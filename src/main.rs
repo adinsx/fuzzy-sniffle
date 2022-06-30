@@ -1,7 +1,7 @@
-mod map;
+mod maps;
 
 use macroquad::prelude::*;
-use map::Map;
+use maps::{cave_map_gen::cave_map_gen, map::Map};
 
 fn window_conf() -> Conf {
     Conf {
@@ -15,17 +15,9 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     // Max's testing start
-    let mut test_map = Map::new(20, 10);
-    for x in 0..12 {
-        for y in 0..6 {
-            let tile = test_map.get_tile_mut(x, y);
-            match tile {
-                Some(t) => t.solid = true,
-                None => panic!("Tried to write to nonexistant Tile at ({x}, {y})"),
-            }
-        }
-    }
-    println!("{test_map}");
+    let mut cave = Map::new(100, 50);
+    cave_map_gen(&mut cave, 0.3, 10);
+    println!("{}", cave);
     // Max's testing end
 
     let suwako_tex: Texture2D = load_texture("suwako.png").await.unwrap();

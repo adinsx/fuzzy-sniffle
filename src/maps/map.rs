@@ -1,33 +1,20 @@
-use rand::random;
+use super::tile::Tile;
 use std::fmt;
 
-pub struct Tile {
-    pub solid: bool,
-}
-impl fmt::Display for Tile {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", if self.solid { "\u{2588}" } else { " " })
-    }
-}
-
+#[derive(Default)]
 pub struct Map {
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
     tiles: Vec<Tile>,
 }
 impl Map {
     pub fn new(width: u32, height: u32) -> Map {
-        let mut ret = Map {
+        Map {
             width,
             height,
-            tiles: Vec::with_capacity((width * height) as usize),
-        };
-        // Where the Map is current randomly intialized
-        for _ in 0..(width * height) as usize {
-            ret.tiles.push(Tile { solid: random() });
+            tiles: vec![Tile { wall: true }; (width * height) as usize],
+            //..Default::default()
         }
-        ret
     }
     // Helper to convert from 2d coordinate into 1d Vec index
     fn xy_to_idx(&self, x: u32, y: u32) -> usize {
@@ -43,6 +30,18 @@ impl Map {
     pub fn get_tile_mut(&mut self, x: u32, y: u32) -> Option<&mut Tile> {
         let index = self.xy_to_idx(x, y);
         self.tiles.get_mut(index)
+    }
+    // Allows negative numbers and numbers larger than the size allows and wraps around
+    pub fn get_tile_modulo(&self, x: i32, y: i32) -> Option<&Tile> {
+        let mod_x = x.rem_euclid(self.width as i32) as u32;
+        let mod_y = y.rem_euclid(self.height as i32) as u32;
+        self.get_tile(mod_x, mod_y)
+    }
+    // Allows negative numbers and numbers larger than the size allows and wraps around
+    pub fn get_tile_modulo_mut(&mut self, x: i32, y: i32) -> Option<&mut Tile> {
+        let mod_x = x.rem_euclid(self.width as i32) as u32;
+        let mod_y = y.rem_euclid(self.height as i32) as u32;
+        self.get_tile_mut(mod_x, mod_y)
     }
 }
 impl fmt::Display for Map {
